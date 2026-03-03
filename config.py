@@ -10,9 +10,9 @@ EMAIL_CONFIG = {
     'imap_port': 993,                     # IMAP端口
     'smtp_server': 'smtp.qiye.163.com',  # SMTP服务器
     'smtp_port': 465,                     # SMTP端口
-    'username': 'your_email@company.com', # 邮箱账号
-    'password': 'your_password',          # 邮箱密码/授权码
-    'folder': 'mailbox'              # 监控的文件夹
+    'username': 'libingfeng@jctrans.net', # 邮箱账号
+    'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
+    'folder': 'insurance',               # 监控的文件夹' 
 }
 
 # 投保系统配置

@@ -14,7 +14,11 @@ import re
 from datetime import datetime
 import os
 
-from config import EMAIL_CONFIG, KEYWORDS
+import pandas as pd
+import json
+import requests
+
+# from config import EMAIL_CONFIG, KEYWORDS
 from database import OnlineSheetManager
 from utils import (
     create_directory_structure,
@@ -24,6 +28,22 @@ from utils import (
     save_attachment,
     write_log
 )
+
+EMAIL_CONFIG = {
+    'imap_server': 'imap.qiye.163.com',  # IMAP服务器
+    'imap_port': 993,                     # IMAP端口
+    'smtp_server': 'smtp.qiye.163.com',  # SMTP服务器
+    'smtp_port': 465,                     # SMTP端口
+    'username': 'libingfeng@jctrans.net', # 邮箱账号
+    'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
+    'folder': 'insurance',               # 监控的文件夹' 
+}
+
+# 关键词配置
+KEYWORDS = {
+    'express_keywords': ['快递', '速递', 'express', 'courier', '顺丰', '圆通', '申通', '中通', '韵达'],
+    'ignore_keywords': ['测试', 'test', 'demo'],
+}
 
 class MailParser:
     """邮件解析器"""
@@ -108,10 +128,10 @@ class MailParser:
                         except:
                             body = part.get_payload(decode=True).decode('gbk', errors='ignore')
                     
-                    # 获取附件
+                    # 获取附件（仅保存Excel文件）
                     elif "attachment" in content_disposition:
                         filename = part.get_filename()
-                        if filename:
+                        if filename and filename.lower().endswith(('.xlsx', '.xls')):
                             attachment_data = {
                                 'filename': filename,
                                 'content': part.get_payload(decode=True)
@@ -242,7 +262,7 @@ class MailParser:
             # 搜索未读邮件
             result, data = mail.search(None, 'UNSEEN')
             if result != 'OK':
-                write_log('应用1', "没有找到未读邮件", 'INFO')
+                write_log('邮件解析', "没有找到未读邮件", 'INFO')
                 mail.logout()
                 return True
             
@@ -293,5 +313,9 @@ def main():
 
 if __name__ == "__main__":
     # 本地测试
+    print(pd.__version__)
+    print(requests.__version__)
+    print(json.__version__)
+
     result = main()
     print(result)
