@@ -4,8 +4,8 @@
 工具函数模块
 """
 
-import xbot
-from xbot import print, sleep
+# import xbot
+# from xbot import print, sleep
 import re
 import os
 import shutil
@@ -30,6 +30,37 @@ def create_directory_structure():
         if not os.path.exists(directory):
             os.makedirs(directory)
             print(f"创建目录: {directory}")
+
+def analyze_goods_type(goods_description):
+    """分析货物类型"""
+    if not goods_description:
+        return '普货'
+    
+    content = str(goods_description).lower()
+    
+    # 检查危险品
+    for keyword in KEYWORDS['dangerous_keywords']:
+        if keyword.lower() in content:
+            return '危险品'
+    
+    # 检查易碎品
+    for keyword in KEYWORDS['fragile_keywords']:
+        if keyword.lower() in content:
+            return '易碎品'
+    
+    return '普货'
+
+def analyze_import_export_type(origin_country):
+    """分析进出口类型"""
+    if not origin_country:
+        return '出口'
+    
+    content = str(origin_country).lower()
+    # 判断是否包含中国
+    if '中国' in content or 'china' in content or 'cn' in content:
+        return '出口'
+    else:
+        return '进口'
 
 def analyze_insurance_type(mail_content, mail_subject):
     """分析投保类型"""
@@ -60,8 +91,25 @@ def extract_bill_number(mail_content):
     
     return ''
 
+def _to_str(val):
+    """将单元格值转为去除首尾空格的字符串"""
+    if val is None or val == '':
+        return ''
+    return str(val).strip()
+
+
+def _to_amount(val):
+    """将单元格值转为数字（发票金额专用），无法转换则返回空字符串"""
+    if val is None or val == '':
+        return ''
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return ''
+
+
 def parse_excel_attachment(file_path):
-    """解析Excel附件"""
+    """解析Excel附件（UTF-8编码）"""
     try:
         import pandas as pd
         
@@ -69,7 +117,7 @@ def parse_excel_attachment(file_path):
         excel_data = {}
         
         # 1. 读取主投保单信息（第一个工作表）
-        df_main = pd.read_excel(file_path, sheet_name=0, header=None).fillna('')
+        df_main = pd.read_excel(file_path, sheet_name=0, header=None, engine='openpyxl').fillna('')
         
         # 基于模板结构解析关键字段
         insured_info = {}
@@ -78,37 +126,37 @@ def parse_excel_attachment(file_path):
         invoice_info = {}
         
         # 解析被保险人信息（行5-10）
-        insured_info['被保险人'] = df_main.iloc[8, 1] if len(df_main) > 8 else ''
-        insured_info['联系电话'] = df_main.iloc[8, 5] if len(df_main) > 8 else ''
-        insured_info['通讯地址'] = df_main.iloc[9, 1] if len(df_main) > 9 else ''
+        insured_info['被保险人'] = _to_str(df_main.iloc[8, 1] if len(df_main) > 8 else '')
+        insured_info['联系电话'] = _to_str(df_main.iloc[8, 5] if len(df_main) > 8 else '')
+        insured_info['通讯地址'] = _to_str(df_main.iloc[9, 1] if len(df_main) > 9 else '')
         
         # 解析货物运输信息（行12-20）
-        transport_info['起运地'] = df_main.iloc[12, 1] if len(df_main) > 12 else ''
-        transport_info['起运国家地区'] = df_main.iloc[12, 3] if len(df_main) > 12 else ''
-        transport_info['目的地'] = df_main.iloc[12, 5] if len(df_main) > 12 else ''
-        transport_info['国家地区'] = df_main.iloc[12, 7] if len(df_main) > 12 else ''
-        transport_info['转运地'] = df_main.iloc[13, 1] if len(df_main) > 13 else ''
-        transport_info['起运日期'] = df_main.iloc[13, 5] if len(df_main) > 13 else ''
-        transport_info['起运日期打印格式'] = df_main.iloc[13, 7] if len(df_main) > 13 else ''
-        transport_info['运输工具号'] = df_main.iloc[14, 1] if len(df_main) > 14 else ''
-        transport_info['运输方式'] = df_main.iloc[14, 5] if len(df_main) > 14 else ''
-        transport_info['装载方式'] = df_main.iloc[14, 7] if len(df_main) > 14 else ''
-        transport_info['赔款偿付地点'] = df_main.iloc[15, 1] if len(df_main) > 15 else ''
-        transport_info['贸易类型'] = df_main.iloc[15, 5] if len(df_main) > 15 else ''
+        transport_info['起运地'] = _to_str(df_main.iloc[12, 1] if len(df_main) > 12 else '')
+        transport_info['起运国家地区'] = _to_str(df_main.iloc[12, 3] if len(df_main) > 12 else '')
+        transport_info['目的地'] = _to_str(df_main.iloc[12, 5] if len(df_main) > 12 else '')
+        transport_info['国家地区'] = _to_str(df_main.iloc[12, 7] if len(df_main) > 12 else '')
+        transport_info['转运地'] = _to_str(df_main.iloc[13, 1] if len(df_main) > 13 else '')
+        transport_info['起运日期'] = _to_str(df_main.iloc[13, 5] if len(df_main) > 13 else '')[:10]
+        transport_info['起运日期打印格式'] = _to_str(df_main.iloc[13, 7] if len(df_main) > 13 else '')
+        transport_info['运输工具号'] = _to_str(df_main.iloc[14, 1] if len(df_main) > 14 else '')
+        transport_info['运输方式'] = _to_str(df_main.iloc[14, 5] if len(df_main) > 14 else '')
+        transport_info['装载方式'] = _to_str(df_main.iloc[14, 7] if len(df_main) > 14 else '')
+        transport_info['赔款偿付地点'] = _to_str(df_main.iloc[15, 1] if len(df_main) > 15 else '')
+        transport_info['贸易类型'] = _to_str(df_main.iloc[15, 5] if len(df_main) > 15 else '')
         
         # 解析货物信息（行16-17）
-        goods_info['唛头'] = df_main.iloc[18, 0] if len(df_main) > 18 else ''
-        goods_info['货物描述'] = df_main.iloc[18, 1] if len(df_main) > 18 else ''
-        goods_info['包装数量'] = df_main.iloc[18, 4] if len(df_main) > 18 else ''
-        goods_info['条款'] = df_main.iloc[19, 1] if len(df_main) > 19 else ''
+        goods_info['唛头'] = _to_str(df_main.iloc[18, 0] if len(df_main) > 18 else '')
+        goods_info['货物描述'] = _to_str(df_main.iloc[18, 1] if len(df_main) > 18 else '')
+        goods_info['包装数量'] = _to_str(df_main.iloc[18, 4] if len(df_main) > 18 else '')
+        goods_info['条款'] = _to_str(df_main.iloc[19, 1] if len(df_main) > 19 else '')
         
         # 解析发票信息（行18-19）
-        invoice_info['发票号'] = df_main.iloc[20, 1] if len(df_main) > 20 else ''
-        invoice_info['提单号'] = df_main.iloc[20, 5] if len(df_main) > 20 else ''
-        invoice_info['发票金额'] = df_main.iloc[21, 1] if len(df_main) > 21 else ''
-        invoice_info['发票币种'] = df_main.iloc[21, 5] if len(df_main) > 21 else ''
-        invoice_info['工作编号'] = df_main.iloc[22, 1] if len(df_main) > 22 else ''
-        invoice_info['备注'] = df_main.iloc[22, 5] if len(df_main) > 22 else ''
+        invoice_info['发票号'] = _to_str(df_main.iloc[20, 1] if len(df_main) > 20 else '')
+        invoice_info['提单号'] = _to_str(df_main.iloc[20, 5] if len(df_main) > 20 else '')
+        invoice_info['发票金额'] = _to_amount(df_main.iloc[21, 1] if len(df_main) > 21 else '')
+        invoice_info['发票币种'] = _to_str(df_main.iloc[21, 5] if len(df_main) > 21 else '')
+        invoice_info['工作编号'] = _to_str(df_main.iloc[22, 1] if len(df_main) > 22 else '')
+        invoice_info['备注'] = _to_str(df_main.iloc[22, 5] if len(df_main) > 22 else '')
         
         excel_data['main_info'] = {
             'insured': insured_info,

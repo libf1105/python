@@ -4,7 +4,17 @@
 配置文件 - 所有配置参数集中管理
 """
 
-# 邮箱配置
+# 文件存储配置
+FILE_CONFIG = {
+    'base_dir': 'D:/自动投保/',
+    'temp_dir': 'D:/自动投保/临时文件/',
+    'log_dir': 'D:/自动投保/日志/',
+    'excel_path': 'D:/自动投保/投保记录.xlsx',
+    'attachment_dir': 'D:/自动投保/邮件附件/',
+    'record_filename': '投保记录_20260308.xlsx',  # 指定要读取的投保记录文件名
+}
+
+
 EMAIL_CONFIG = {
     'imap_server': 'imap.qiye.163.com',  # IMAP服务器
     'imap_port': 993,                     # IMAP端口
@@ -12,53 +22,32 @@ EMAIL_CONFIG = {
     'smtp_port': 465,                     # SMTP端口
     'username': 'libingfeng@jctrans.net', # 邮箱账号
     'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
-    'folder': 'insurance',               # 监控的文件夹' 
+    'folder': '"INBOX/04 &T92WaU4aUqGQ6A-"',               # 监控的文件夹' 
 }
 
 # 投保系统配置
 INSURANCE_SYSTEMS = {
     '快递': {
-        'login_url': ' https://express-insurance-system.com/login',
-        'submit_url': ' https://express-insurance-system.com/submit',
-        'query_url': ' https://express-insurance-system.com/query',
-        'username': 'express_user',
-        'password': 'express_pass',
+        # 'login_url': ' https://express-insurance-system.com/login',
+        'submit_url': ' http://www.moubaoins.com/home',
+        'query_url': ' http://www.moubaoins.com/home',
+        # 'username': 'express_user',
+        # 'password': 'express_pass',
     },
     '非快递': {
-        'login_url': ' https://normal-insurance-system.com/login',
-        'submit_url': ' https://normal-insurance-system.com/submit',
-        'query_url': ' https://normal-insurance-system.com/query',
-        'username': 'normal_user',
-        'password': 'normal_pass',
+        # 'login_url': ' https://normal-insurance-system.com/login',
+        'submit_url': ' https://www.yunjiins.cn/policies/insure/intl',
+        'query_url': ' https://www.yunjiins.cn/policies/intl',
+        # 'username': 'normal_user',
+        # 'password': 'normal_pass',
     }
 }
 
-# 文件存储配置
-FILE_CONFIG = {
-    'base_dir': 'D:/保险保单/',
-    'temp_dir': 'D:/保险保单/临时文件/',
-    'log_dir': 'D:/保险保单/日志/',
-}
-
-# 在线表格配置
-ONLINE_SHEET_CONFIG = {
-    'type': 'feishu',  # feishu/dingtalk/excel
-    'app_id': 'your_app_id',
-    'app_secret': 'your_app_secret',
-    'sheet_token': 'your_sheet_token',
-    'sheet_id': 'your_sheet_id',
-}
-
-# 定时任务配置
-SCHEDULE_CONFIG = {
-    'mail_parse_times': ['12:00', '21:00'],
-    'insurance_process_times': ['13:00', '22:00'],
-    'policy_download_times': ['14:00', '23:00'],
-    'mail_reply_times': ['14:00', '23:00'],
-}
 
 # 关键词配置
 KEYWORDS = {
     'express_keywords': ['快递', '速递', 'express', 'courier', '顺丰', '圆通', '申通', '中通', '韵达'],
     'ignore_keywords': ['测试', 'test', 'demo'],
+    'fragile_keywords': ['易碎', '玻璃', '陶瓷', '陶器', '瓷器', '镜子', '镜面', '灯具', '灯饰', '工艺品', '陶艺', 'glass', 'ceramic', 'fragile', 'mirror'],
+    'dangerous_keywords': ['危险品', '电池', '磁铁', '磁性', '化学品', '液体', '气体', '易燃', '易爆', '腐蚀', '有毒', '放射', 'battery', 'magnet', 'chemical', 'liquid', 'gas', 'flammable', 'explosive', 'corrosive', 'toxic', 'radioactive']
 }

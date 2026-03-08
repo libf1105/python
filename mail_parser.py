@@ -5,8 +5,8 @@
 定时任务：每天12:00和21:00执行
 """
 
-import xbot
-from xbot import print, sleep
+# import xbot
+# from xbot import print, sleep
 import imaplib
 import email
 from email.header import decode_header
@@ -18,39 +18,25 @@ import pandas as pd
 import json
 import requests
 
-# from config import EMAIL_CONFIG, KEYWORDS
-from database import OnlineSheetManager
+from config import EMAIL_CONFIG, KEYWORDS, FILE_CONFIG
+from database import LocalSheetManager
 from utils import (
     create_directory_structure,
     analyze_insurance_type,
+    analyze_goods_type,
+    analyze_import_export_type,
     extract_bill_number,
     parse_excel_attachment,
     save_attachment,
     write_log
 )
 
-EMAIL_CONFIG = {
-    'imap_server': 'imap.qiye.163.com',  # IMAP服务器
-    'imap_port': 993,                     # IMAP端口
-    'smtp_server': 'smtp.qiye.163.com',  # SMTP服务器
-    'smtp_port': 465,                     # SMTP端口
-    'username': 'libingfeng@jctrans.net', # 邮箱账号
-    'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
-    'folder': 'insurance',               # 监控的文件夹' 
-}
-
-# 关键词配置
-KEYWORDS = {
-    'express_keywords': ['快递', '速递', 'express', 'courier', '顺丰', '圆通', '申通', '中通', '韵达'],
-    'ignore_keywords': ['测试', 'test', 'demo'],
-}
-
 class MailParser:
     """邮件解析器"""
     
     def __init__(self):
         self.email_config = EMAIL_CONFIG
-        self.sheet_manager = OnlineSheetManager()
+        self.sheet_manager = LocalSheetManager()
         create_directory_structure()
     
     def connect_email(self):
@@ -93,6 +79,7 @@ class MailParser:
             'subject': '',
             'from': '',
             'date': '',
+            'receive_time': '',
             'body': '',
             'attachments': []
         }
@@ -110,6 +97,14 @@ class MailParser:
             date_header = msg.get('Date', '')
             email_data['date'] = str(date_header)
             
+            # 解析邮件接收时间
+            from email.utils import parsedate_to_datetime
+            try:
+                dt = parsedate_to_datetime(date_header)
+                email_data['receive_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                email_data['receive_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             # 解析邮件ID
             email_id = msg.get('Message-ID', '')
             email_data['email_id'] = str(email_id)
@@ -124,24 +119,42 @@ class MailParser:
                     # 获取正文
                     if content_type == "text/plain" and "attachment" not in content_disposition:
                         try:
-                            body = part.get_payload(decode=True).decode()
+                            body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         except:
-                            body = part.get_payload(decode=True).decode('gbk', errors='ignore')
+                            try:
+                                body = part.get_payload(decode=True).decode('gbk', errors='ignore')
+                            except:
+                                body = part.get_payload(decode=True).decode('latin-1', errors='ignore')
                     
-                    # 获取附件（仅保存Excel文件）
+                    # 获取附件
                     elif "attachment" in content_disposition:
                         filename = part.get_filename()
-                        if filename and filename.lower().endswith(('.xlsx', '.xls')):
+                        if filename:
+                            # 解码附件名
+                            if isinstance(filename, str):
+                                decoded_filename = filename
+                            else:
+                                decoded_parts = decode_header(filename)
+                                decoded_filename = ''
+                                for part_data, encoding in decoded_parts:
+                                    if isinstance(part_data, bytes):
+                                        decoded_filename += part_data.decode(encoding or 'utf-8', errors='ignore')
+                                    else:
+                                        decoded_filename += str(part_data)
+                            
                             attachment_data = {
-                                'filename': filename,
+                                'filename': decoded_filename,
                                 'content': part.get_payload(decode=True)
                             }
                             email_data['attachments'].append(attachment_data)
             else:
                 try:
-                    body = msg.get_payload(decode=True).decode()
+                    body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
                 except:
-                    body = msg.get_payload(decode=True).decode('gbk', errors='ignore')
+                    try:
+                        body = msg.get_payload(decode=True).decode('gbk', errors='ignore')
+                    except:
+                        body = msg.get_payload(decode=True).decode('latin-1', errors='ignore')
             
             email_data['body'] = body
             return email_data
@@ -177,7 +190,7 @@ class MailParser:
             if result != 'OK':
                 return False
             
-            raw_email = data
+            raw_email = data[0][1]
             msg = email.message_from_bytes(raw_email)
             
             # 解析邮件内容
@@ -185,6 +198,20 @@ class MailParser:
             
             # 判断是否处理
             if not self.should_process_mail(email_data):
+                return False
+            
+            # 检查记录是否已存在
+            if self.sheet_manager.record_exists(
+                email_data['receive_time'],
+                email_data['from'],
+                email_data['subject']
+            ):
+                write_log('应用1', 
+                    f"邮件已存在，跳过处理: {email_data['subject']} | 接收时间: {email_data['receive_time']} | 发件人: {email_data['from']}",
+                    'WARNING'
+                )
+                # 标记重复邮件为已读
+                mail.store(email_uid, '+FLAGS', '\\Seen')
                 return False
             
             # 分析投保类型
@@ -196,32 +223,120 @@ class MailParser:
             # 提取提单号
             bill_number = extract_bill_number(email_data['body'])
             
+            # 初始化货物信息
+            goods_name = ''
+            goods_mark = ''
+            goods_type = '普货'
+            import_export_type = '出口'
+            
             # 处理附件
+            attachment_paths = []
             attachment_info = {}
             if email_data['attachments']:
+                # 获取邮件接收日期
+                receive_date = email_data['receive_time'].split(' ')[0]
+                attachment_dir = os.path.join(FILE_CONFIG['attachment_dir'], receive_date)
+                if not os.path.exists(attachment_dir):
+                    os.makedirs(attachment_dir)
+                
                 for attachment in email_data['attachments']:
                     filename = attachment['filename']
+                    # 解码附件名
+                    if '=?' in filename:
+                        decoded_parts = decode_header(filename)
+                        decoded_filename = ''
+                        for part_data, encoding in decoded_parts:
+                            if isinstance(part_data, bytes):
+                                decoded_filename += part_data.decode(encoding or 'utf-8', errors='ignore')
+                            else:
+                                decoded_filename += str(part_data)
+                        filename = decoded_filename
+                    
+                    filepath = os.path.join(attachment_dir, filename)
+                    
+                    # 保存附件（指定UTF-8编码）
+                    with open(filepath, 'wb') as f:
+                        f.write(attachment['content'])
+                    
+                    # 使用Windows路径格式
+                    windows_path = filepath.replace('/', '\\')
+                    attachment_paths.append(windows_path)
+                    print(f"附件保存成功: {windows_path}")
+                    
+                    # 如果是Excel文件，解析内容
                     if filename.lower().endswith(('.xlsx', '.xls')):
-                        # 保存附件
-                        filepath = save_attachment(attachment['content'], filename)
-                        if filepath:
-                            # 解析Excel
-                            excel_data = parse_excel_attachment(filepath)
+                        excel_data = parse_excel_attachment(filepath)
+                        if excel_data:
                             attachment_info = excel_data
+                            # 提取货物信息
+                            main_info = excel_data.get('main_info', {})
+                            goods_info = main_info.get('goods', {})
+                            transport_info = main_info.get('transport', {})
+                            
+                            # 货物名称
+                            goods_name = goods_info.get('货物描述', '')
+                            # 唔头
+                            goods_mark = goods_info.get('唔头', '')
+                            # 起运国家地区
+                            origin_country = transport_info.get('起运国家地区', '')
+                            
+                            # 分析货物类型
+                            goods_type = analyze_goods_type(goods_name)
+                            # 分析进出口类型
+                            import_export_type = analyze_import_export_type(origin_country)
             
-            # 准备记录数据
+            # 准备记录数据（所有字符串字段去除首尾空格）
+            def s(v):
+                return str(v).strip() if v is not None else ''
+
             record_data = {
-                '发件人': email_data['from'],
-                '邮件标题': email_data['subject'],
-                '邮件内容': email_data['body'][:500],  # 只保存前500字符
-                '投保类型': insurance_type,
-                '邮件ID': email_data.get('email_id', ''),
-                '处理备注': f"提单号: {bill_number}"
+                '邮件接收时间': s(email_data['receive_time']),
+                '发件人': s(email_data['from']),
+                '邮件标题': s(email_data['subject']),
+                '邮件内容': ' '.join(email_data['body'][:500].split()),
+                '邮件附件': '; '.join(attachment_paths) if attachment_paths else '',
+                '投保类型': s(insurance_type),
+                '货物名称': s(goods_name),
+                '货物类型': s(goods_type),
+                '进出口类型': s(import_export_type),
+                '邮件ID': s(email_data.get('email_id', '')),
+                '处理备注': s(f"提单号: {bill_number} | 唛头: {goods_mark}")
             }
             
-            # 合并附件信息
+            # 添加Excel附件解析字段
             if attachment_info:
-                record_data['处理备注'] += f" | 附件信息: {str(attachment_info)}"
+                main_info = attachment_info.get('main_info', {})
+                insured_info = main_info.get('insured', {})
+                transport_info = main_info.get('transport', {})
+                goods_info = main_info.get('goods', {})
+                invoice_info = main_info.get('invoice', {})
+                
+                record_data.update({
+                    '被保险人': s(insured_info.get('被保险人', '')),
+                    '联系电话': s(insured_info.get('联系电话', '')),
+                    '通讯地址': s(insured_info.get('通讯地址', '')),
+                    '起运地': s(transport_info.get('起运地', '')),
+                    '起运国家地区': s(transport_info.get('起运国家地区', '')),
+                    '目的地': s(transport_info.get('目的地', '')),
+                    '目的国家地区': s(transport_info.get('国家地区', '')),
+                    '转运地': s(transport_info.get('转运地', '')),
+                    '起运日期': s(transport_info.get('起运日期', '')),
+                    '起运日期打印格式': s(transport_info.get('起运日期打印格式', '')),
+                    '运输工具号': s(transport_info.get('运输工具号', '')),
+                    '运输方式': s(transport_info.get('运输方式', '')),
+                    '装载方式': s(transport_info.get('装载方式', '')),
+                    '赔款偿付地点': s(transport_info.get('赔款偿付地点', '')),
+                    '贸易类型': s(transport_info.get('贸易类型', '')),
+                    '唔头': s(goods_info.get('唔头', '')),
+                    '包装数量': s(goods_info.get('包装数量', '')),
+                    '条款': s(goods_info.get('条款', '')),
+                    '发票号': s(invoice_info.get('发票号', '')),
+                    '提单号': s(invoice_info.get('提单号', '')),
+                    '发票金额': invoice_info.get('发票金额', ''),
+                    '发票币种': s(invoice_info.get('发票币种', '')),
+                    '工作编号': s(invoice_info.get('工作编号', '')),
+                    '备注': s(invoice_info.get('备注', ''))
+                })
             
             # 添加到在线表格
             success = self.sheet_manager.add_record(record_data)
@@ -257,7 +372,11 @@ class MailParser:
                 return False
             
             # 选择文件夹
-            mail.select(self.email_config['folder'])
+            result = mail.select(self.email_config['folder'])
+            if result[0] != 'OK':
+                write_log('应用1', f"选择文件夹失败: {self.email_config['folder']}", 'ERROR')
+                mail.logout()
+                return False
             
             # 搜索未读邮件
             result, data = mail.search(None, 'UNSEEN')
@@ -285,7 +404,8 @@ class MailParser:
                     success_count += 1
                 
                 # 避免处理过快
-                sleep(1)
+                import time
+                time.sleep(1)
             
             # 登出
             mail.logout()
@@ -312,6 +432,11 @@ def main():
         return {"status": "error", "message": "邮件解析任务失败"}
 
 if __name__ == "__main__":
+    import sys
+    import io
+    # 设置标准输出编码为UTF-8
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    
     # 本地测试
     print(pd.__version__)
     print(requests.__version__)
