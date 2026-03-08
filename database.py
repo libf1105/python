@@ -1,7 +1,7 @@
-# 在线表格操作
+# 表格操作
 # database.py
 """
-在线表格操作模块 - 基于本地Excel
+表格操作模块 - 基于本地Excel
 """
 
 # import xbot

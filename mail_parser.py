@@ -338,7 +338,7 @@ class MailParser:
                     '备注': s(invoice_info.get('备注', ''))
                 })
             
-            # 添加到在线表格
+            # 添加到本地表格
             success = self.sheet_manager.add_record(record_data)
             
             if success:
