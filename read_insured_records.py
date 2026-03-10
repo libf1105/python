@@ -34,10 +34,9 @@ class InsuredRecordReader:
                 print(f"文件不存在: {self.excel_path}")
                 return []
 
-            df = pd.read_excel(self.excel_path, engine='openpyxl')
+            # 读取Excel文件，所有数据按字符串处理
+            df = pd.read_excel(self.excel_path, engine='openpyxl', dtype=str)
             df = df.fillna('')
-            if '提单号' in df.columns:
-                df['提单号'] = df['提单号'].apply(lambda x: str(int(float(x))) if x != '' else '')
 
             if len(df) == 0:
                 print("Excel文件中没有记录")

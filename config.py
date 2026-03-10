@@ -23,6 +23,18 @@ EMAIL_CONFIG = {
     'username': 'libingfeng@jctrans.net', # 邮箱账号
     'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
     'folder': '"INBOX/04 &T92WaU4aUqGQ6A-"',               # 监控的文件夹' 
+    'reply_body': '''尊敬的客户，
+
+您好！
+
+您的货物保险已成功投保，保单文件请见附件。
+
+如有任何疑问，请随时联系我们。
+
+谢谢！
+
+此致
+敬礼！''',  # 回复邮件正文
 }
 
 # 投保系统配置

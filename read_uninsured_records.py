@@ -44,9 +44,7 @@ class UninsuredRecordReader:
             # 读取Excel文件，将NaN转换为空字符串
             df = pd.read_excel(self.excel_path, engine='openpyxl')
             df = df.fillna('')
-            if '提单号' in df.columns:
-                df['提单号'] = df['提单号'].apply(lambda x: str(int(float(x))) if x != '' else '')
-            
+
             if len(df) == 0:
                 print("Excel文件中没有记录")
                 return []
