@@ -102,7 +102,7 @@ def main():
         print(f"  目的地: {record.get('目的地', '')}")
         print(f"  发票金额: {record.get('发票金额', '')}")
         print(f"  发票币种: {record.get('发票币种', '')}")
-        print()
+        print(record)
     
     # 演示如何访问单个记录的字段
     print("=" * 60)

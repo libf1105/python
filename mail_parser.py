@@ -36,8 +36,8 @@ class MailParser:
     
     def __init__(self):
         self.email_config = EMAIL_CONFIG
-        self.sheet_manager = LocalSheetManager()
         create_directory_structure()
+        self.sheet_manager = LocalSheetManager()
     
     def connect_email(self):
         """连接邮箱"""
@@ -197,8 +197,8 @@ class MailParser:
             email_data = self.parse_email_content(msg)
             
             # 判断是否处理
-            if not self.should_process_mail(email_data):
-                return False
+            # if not self.should_process_mail(email_data):
+            #     return False
             
             # 检查记录是否已存在
             if self.sheet_manager.record_exists(
@@ -252,6 +252,8 @@ class MailParser:
                                 decoded_filename += str(part_data)
                         filename = decoded_filename
                     
+                    # 只取文件名部分，防止路径遍历攻击
+                    filename = os.path.basename(filename)
                     filepath = os.path.join(attachment_dir, filename)
                     
                     # 保存附件（指定UTF-8编码）

@@ -11,7 +11,7 @@ FILE_CONFIG = {
     'log_dir': 'D:/自动投保/日志/',
     'excel_path': 'D:/自动投保/投保记录.xlsx',
     'attachment_dir': 'D:/自动投保/邮件附件/',
-    'record_filename': '投保记录_20260308.xlsx',  # 指定要读取的投保记录文件名
+    'record_filename': '投保记录_20260314.xlsx',  # 指定要读取的投保记录文件名
 }
 
 
@@ -21,7 +21,7 @@ EMAIL_CONFIG = {
     'smtp_server': 'smtp.qiye.163.com',  # SMTP服务器
     'smtp_port': 465,                     # SMTP端口
     'username': 'libingfeng@jctrans.net', # 邮箱账号
-    'password': '2LnX!cZ@BFe8.*n',          # 邮箱密码/授权码
+    'password': 'vh9w#4tw3$qd@B4G',          # 邮箱密码/授权码
     'folder': '"INBOX/04 &T92WaU4aUqGQ6A-"',               # 监控的文件夹' 
     'reply_body': '''尊敬的客户，
 
